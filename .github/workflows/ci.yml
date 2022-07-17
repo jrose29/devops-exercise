@@ -1,0 +1,47 @@
+---
+name: Docker CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.x'
+      
+      - name: Install prerequisites.
+        run: pip3 install toml-cli pytest
+
+      - name: Get application version from pyproject.toml for Docker Image tag
+        run: |
+           echo "image_tag=$(toml get --toml-path pyproject.toml tool.poetry.version)" >> $GITHUB_ENV
+
+      - name: Build the Docker Image
+        uses: docker/build-push-action@v2
+        with:
+          push: false
+          tags: ${{ github.repository }}:v${{ env.image_tag }}
+          load: true
+
+      - name: Run Unit test
+        uses: addnab/docker-run-action@v3
+        with:
+          image: ${{ github.repository }}:v${{ env.image_tag }}
+          run: python3 -m unittest
